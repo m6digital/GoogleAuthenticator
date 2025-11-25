@@ -4,13 +4,12 @@
 <div class="p-2 alert alert-info">{$message}</div>
 {/if}
 
-<p>Scan this QR code into Google Authenticator, Authy, Microsoft Authenticator, or another TOTP app.</p>
+<p>Scan this QR code into Google Authenticator.</p>
 
 <div style="margin:20px 0;">
     <img src="{$qrurl}" alt="QR Code">
 </div>
 
-<p><strong>Your Secret Key:</strong> <code>{$secret}</code></p>
 
 <hr>
 

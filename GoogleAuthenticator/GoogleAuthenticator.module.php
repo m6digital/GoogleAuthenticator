@@ -282,40 +282,44 @@ class GoogleAuthenticator extends CMSModule
      * Get user's 2FA secret
      */
     public function GetUserSecret($userid)
-    {
-        $db = \cms_utils::get_db();
-        $query = "SELECT secret FROM " . cms_db_prefix() . "module_ga_users 
-                  WHERE user_id = ?";
+	{
+		$db = \cms_utils::get_db();
+		$query = "SELECT secret FROM " . cms_db_prefix() . "module_ga_users 
+				  WHERE user_id = ?";
 
-        return $db->GetOne($query, array((int)$userid));
-    }
+		$encrypted = $db->GetOne($query, array((int)$userid));
+		return $this->DecryptSecret($encrypted);
+	}
+
 
     /**
      * Save user's 2FA secret
      */
     public function SaveUserSecret($userid, $secret, $enabled = false)
-    {
-        $db = \cms_utils::get_db();
+	{
+		$db = \cms_utils::get_db();
 
-        $userid = (int)$userid;
-        $enabled_flag = $enabled ? 1 : 0;
+		$userid = (int)$userid;
+		$enabled_flag = $enabled ? 1 : 0;
+		$encrypted = $this->EncryptSecret($secret);
 
-        // Check if record exists
-        $query = "SELECT user_id FROM " . cms_db_prefix() . "module_ga_users WHERE user_id = ?";
-        $exists = $db->GetOne($query, array($userid));
+		// Check if record exists
+		$query = "SELECT user_id FROM " . cms_db_prefix() . "module_ga_users WHERE user_id = ?";
+		$exists = $db->GetOne($query, array($userid));
 
-        if ($exists) {
-            $query = "UPDATE " . cms_db_prefix() . "module_ga_users 
-                      SET secret = ?, enabled = ?, modified_date = NOW() 
-                      WHERE user_id = ?";
-            $db->Execute($query, array($secret, $enabled_flag, $userid));
-        } else {
-            $query = "INSERT INTO " . cms_db_prefix() . "module_ga_users 
-                      (user_id, secret, enabled, created_date, modified_date) 
-                      VALUES (?, ?, ?, NOW(), NOW())";
-            $db->Execute($query, array($userid, $secret, $enabled_flag));
-        }
-    }
+		if ($exists) {
+			$query = "UPDATE " . cms_db_prefix() . "module_ga_users 
+					  SET secret = ?, enabled = ?, modified_date = NOW() 
+					  WHERE user_id = ?";
+			$db->Execute($query, array($encrypted, $enabled_flag, $userid));
+		} else {
+			$query = "INSERT INTO " . cms_db_prefix() . "module_ga_users 
+					  (user_id, secret, enabled, created_date, modified_date) 
+					  VALUES (?, ?, ?, NOW(), NOW())";
+			$db->Execute($query, array($userid, $encrypted, $enabled_flag));
+		}
+	}
+
 
     /**
      * Enable 2FA for a user
@@ -378,7 +382,7 @@ class GoogleAuthenticator extends CMSModule
     /**
      * Generate a new secret
      */
-    public function GenerateSecret($length = 16)
+    public function GenerateSecret($length = 32)
 	{
 		$ga = $this->getGA();
 
@@ -405,6 +409,49 @@ class GoogleAuthenticator extends CMSModule
 
 			return $secret;
 		}
+	}
+	
+	private function EncryptSecret($plaintext)
+	{
+		$key = $this->GetEncryptionKey();
+		$iv = random_bytes(16); // AES block size
+
+		$ciphertext = openssl_encrypt($plaintext, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+
+		// Store iv + ciphertext together (base64)
+		return base64_encode($iv . $ciphertext);
+	}
+
+	/**
+	 * Decrypt a secret retrieved from the database
+	 */
+	private function DecryptSecret($stored)
+	{
+		if (!$stored) return null;
+
+		$key = $this->GetEncryptionKey();
+		$raw = base64_decode($stored);
+
+		if (!$raw || strlen($raw) < 17) return null;
+
+		$iv = substr($raw, 0, 16);
+		$ciphertext = substr($raw, 16);
+
+		return openssl_decrypt($ciphertext, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+	}
+
+	/**
+	 * Load or generate a stable encryption key
+	 */
+	private function GetEncryptionKey()
+	{
+		$key = $this->GetPreference('enc_key', '');
+		if ($key === '') {
+			// 32 bytes = 256-bit key
+			$key = bin2hex(random_bytes(32));
+			$this->SetPreference('enc_key', $key);
+		}
+		return hex2bin($key);
 	}
 
 
