@@ -7,7 +7,7 @@ $dict = NewDataDictionary($db);
 // Create users table
 $fields = "
     user_id I KEY,
-    secret C(32) NOTNULL,
+    secret C(255) NOTNULL,
     enabled I1 DEFAULT 0,
     first_login_date T,
     grace_expires T,
