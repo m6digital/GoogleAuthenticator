@@ -1,39 +1,86 @@
 <?php
 if (!defined('CMS_VERSION')) exit;
 
-$userid = get_userid();
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+$config = cmsms()->GetConfig();
+
+$userid = $_SESSION[GoogleAuthenticator::SESSION_TEMP_USER] ?? 0;
 $code   = trim($params['code'] ?? '');
 
+audit('', 'GoogleAuthenticator', "process_verify_2fa: userid={$userid}");
+audit('', 'GoogleAuthenticator', "process_verify_2fa: code_entered={$code}");
+
 if (!$userid) {
-    echo $this->ShowErrors('Invalid user.');
+    echo $this->ShowErrors('Session expired. Please log in again.');
     return;
 }
 
 if ($code === '') {
-    echo $this->ShowErrors('Please enter your 6-digit code.');
+    echo $this->ShowErrors('Please enter your verification code.');
     return;
 }
 
-// Load secret
+// Load user secret
 $secret = $this->GetUserSecret($userid);
+audit('', 'GoogleAuthenticator', "process_verify_2fa: secret={$secret}");
+
 if (!$secret) {
-    echo $this->ShowErrors('No secret found. Generate one first.');
+    echo $this->ShowErrors('No 2FA secret found for this user.');
     return;
 }
 
-// Validate using preference-driven window
-if (!$this->VerifyCode($secret, $code)) {
-    echo $this->ShowErrors('Invalid or expired code.');
-    return;
+$ga = $this->getGA();
+$window = (int)$this->GetPreference('totp_discrepancy', 1);
+
+// --------------------------------------------------------------
+// 1) PRIMARY: Validate via 6-digit TOTP
+// --------------------------------------------------------------
+$is_valid_totp = false;
+
+if (preg_match('/^[0-9]{6}$/', $code)) {
+    $is_valid_totp = $ga->verifyCode($secret, $code, $window);
 }
 
-// Enable 2FA
-$this->EnableUser2FA($userid);
+if ($is_valid_totp) {
+    audit('', 'GoogleAuthenticator', "process_verify_2fa: TOTP OK for user {$userid}");
 
-// Optional: auto-generate backup codes
-if ($this->GetPreference('enable_backup_codes', 0)) {
-    $this->GenerateBackupCodes($userid);
+    $_SESSION[GoogleAuthenticator::SESSION_2FA_VERIFIED] = $userid;
+    unset($_SESSION[GoogleAuthenticator::SESSION_TEMP_USER]);
+
+    redirect($config['admin_url']);
+    exit;
 }
 
-$this->Redirect($id, 'defaultadmin', '', ['message' => 'Two-Factor Authentication enabled!']);
+
+// --------------------------------------------------------------
+// 2) SECONDARY: Backup Code
+// --------------------------------------------------------------
+$enable_backup = (int)$this->GetPreference('enable_backup_codes', 1);
+
+if ($enable_backup) {
+
+    audit('', 'GoogleAuthenticator', "process_verify_2fa: checking backup codes…");
+
+    if ($this->UseBackupCode($userid, $code)) {
+
+        audit('', 'GoogleAuthenticator', "process_verify_2fa: BACKUP CODE OK for user {$userid}");
+
+        $_SESSION[GoogleAuthenticator::SESSION_2FA_VERIFIED] = $userid;
+        unset($_SESSION[GoogleAuthenticator::SESSION_TEMP_USER]);
+
+        redirect($config['admin_url']);
+        exit;
+    }
+}
+
+
+// --------------------------------------------------------------
+// FAILURE: Neither TOTP nor backup code matched
+// --------------------------------------------------------------
+audit('', 'GoogleAuthenticator', "process_verify_2fa: INVALID CODE for user {$userid}");
+
+echo $this->ShowErrors('Invalid verification code. Please try again.');
 return;
