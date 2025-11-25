@@ -145,13 +145,13 @@ class GoogleAuthenticator extends CMSModule
 		audit('', 'GoogleAuthenticator', "DoEvent: originator=$originator, event=$eventname");
 
 		if ($originator == 'Core' && $eventname == 'LoginPost') {
-			audit('', 'GoogleAuthenticator', "HandleLoginPost being called");
+			//audit('', 'GoogleAuthenticator', "HandleLoginPost being called");
 			$this->HandleLoginPost($params);
 			return;
 		}
 
 		if ($originator == 'Core' && $eventname == 'LogoutPost') {
-			audit('', 'GoogleAuthenticator', "HandleLogoutPost being called");
+			//audit('', 'GoogleAuthenticator', "HandleLogoutPost being called");
 			$this->HandleLogoutPost($params);
 			return;
 		}
@@ -161,60 +161,52 @@ class GoogleAuthenticator extends CMSModule
 	
 	private function Enforce2FA()
 	{
-		audit('', 'GoogleAuthenticator', 'Enforce2FA fired');
-
 		$userid = get_userid();
+		if (!$userid) return;
+		if (empty($_SESSION[CMS_USER_KEY])) return;
 
-		// Not logged in yet → skip
-		if (!$userid) {
-			audit('', 'GoogleAuthenticator', 'No logged-in user — skipping');
-			return;
-		}
+		// 2FA disabled?
+		if (!$this->IsUser2FAEnabled($userid)) return;
 
-		// No admin session key → skip
-		if (empty($_SESSION[CMS_USER_KEY])) {
-			audit('', 'GoogleAuthenticator', 'No CMS_USER_KEY in session — skipping');
-			return;
-		}
-
-		audit('', 'GoogleAuthenticator', "Enforce2FA sees user_id={$userid}");
-
-		// If user has 2FA disabled → allow
-		if (!$this->IsUser2FAEnabled($userid)) {
-			audit('', 'GoogleAuthenticator', "User {$userid} has 2FA disabled — allow");
-			return;
-		}
-
-		// Already verified → allow
+		// Already verified?
 		if (!empty($_SESSION[self::SESSION_2FA_VERIFIED]) &&
 			$_SESSION[self::SESSION_2FA_VERIFIED] == $userid) {
-
-			audit('', 'GoogleAuthenticator', "User {$userid} already 2FA verified");
 			return;
 		}
 
-		// Not verified → must redirect to MFA page
+		// Mark as needing MFA
 		$_SESSION[self::SESSION_TEMP_USER] = $userid;
+
+		// Avoid looping on verify pages
+		$req = $_SERVER['REQUEST_URI'] ?? '';
+		if (strpos($req, 'verify_2fa') !== false ||
+			strpos($req, 'process_verify_2fa') !== false) {
+			return;
+		}
 
 		$config = cmsms()->GetConfig();
 		$admin_url = $config['root_url'] . '/' . $config['admin_dir'];
 
-		// Prevent infinite loop
-		$req = $_SERVER['REQUEST_URI'] ?? '';
-		if (strpos($req, 'verify_2fa') !== false ||
-			strpos($req, 'process_verify_2fa') !== false) {
-
-			audit('', 'GoogleAuthenticator', 'Already on verify page');
-			return;
+		// --- FIX: PRESERVE CMSMS ADMIN SECURITY TOKEN ---
+		$secure_param = CMS_SECURE_PARAM_NAME;
+		$secure_value = $_GET[$secure_param] ?? $_SESSION[$secure_param] ?? '';
+		
+		$token = '';
+		if ($secure_value) {
+			$token = "&{$secure_param}={$secure_value}";
 		}
 
-		$url = $admin_url . '/moduleinterface.php?mact=GoogleAuthenticator,m1_,verify_2fa,0';
+		// Correct MFA redirect (token included)
+		$verify_url = $admin_url 
+					. '/moduleinterface.php?mact=GoogleAuthenticator,m1_,verify_2fa,0'
+					. $token;
 
-		audit('', 'GoogleAuthenticator', "Enforce2FA redirect to {$url}");
+		//audit('', 'GoogleAuthenticator', "Redirect → {$verify_url}");
 
-		redirect($url);
+		redirect($verify_url);
 		exit;
 	}
+
 
 
 
@@ -227,7 +219,7 @@ class GoogleAuthenticator extends CMSModule
 		$userid = $params['user']->id ?? 0;
 		if (!$userid) return;
 
-		audit('', 'GoogleAuthenticator', "HandleLoginPost: userid={$userid}");
+		//audit('', 'GoogleAuthenticator', "HandleLoginPost: userid={$userid}");
 
 		// If user does NOT have 2FA enabled → do nothing
 		if (!$this->IsUser2FAEnabled($userid)) {
@@ -246,7 +238,7 @@ class GoogleAuthenticator extends CMSModule
 		// Just mark this user as requiring 2FA — DO NOT REDIRECT YET
 		$_SESSION[self::SESSION_TEMP_USER] = $userid;
 
-		audit('', 'GoogleAuthenticator', "Set SESSION_TEMP_USER={$userid}");
+		//audit('', 'GoogleAuthenticator', "Set SESSION_TEMP_USER={$userid}");
 	}
 
 
