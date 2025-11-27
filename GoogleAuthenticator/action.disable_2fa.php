@@ -39,6 +39,5 @@ if (isset($_SESSION[GoogleAuthenticator::SESSION_2FA_VERIFIED]) &&
 audit('', 'GoogleAuthenticator', "Admin disabled 2FA for user ID {$userid}");
 
 // Redirect back to Manage Users
-$this->Redirect($id, 'admin_users', $returnid, [
-    'message' => '2FA disabled for user ' . $cmsuser->username
-]);
+$this->SetMessage('2FA Has Been Disabled For This User');
+$this->Redirect($id,'admin_users',$returnid);

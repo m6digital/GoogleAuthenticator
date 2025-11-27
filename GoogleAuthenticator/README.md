@@ -10,15 +10,34 @@ while users can self-enroll, manage backup codes, and reset their secret.
 The module integrates deeply with CMSMS’s login flow, preventing access to the admin area until a valid MFA code is entered.
 </p>
 
+<h2>Installation Notes</h2>
+<p>This was an attempt to provide 2FA without touching any of the core files. This is accomplished with utilizing \CMSMS\HookManager::add_hook('admin_add_headtext', [ $this, 'AdminAddHeadtext' ]); since this is
+called on all admin pages driven by moduleinterface.php. This effectively does lock down a good amount of functionality in the Admin but not everything. Some pages are not driven by this <em>(admin/adminlog.php, admin/listusers.php)</em>. In order to force this module to implement 2FA on ALL these pages you can
+add the following to admin/header.php:</p>
+<pre>
+
+$userid = get_userid();
+$smarty = \Smarty_CMS::get_instance();
+
+//ADDED FOR 2FA
+\CMSMS\HookManager::do_hook_accumulate('admin_add_headtext');
+
+</pre>
+
+<p>Future updates to the core CMSMS might overwrite this file.</p>
+
+<p>WOULD LOVE TO SEE AN AUTHENTICATION HOOK AVAILABLE AS PART OF THE CORE FOR THIS :)</p>
+
+
 <h2>Features</h2>
 
 <h3>User Self-Enrollment</h3>
 <ul>
     <li>Generate a TOTP secret</li>
-    <li>Scan a QR code into Google Authenticator, Authy, Microsoft Authenticator, etc.</li>
+    <li>Scan a QR code into Google Authenticator.</li>
     <li>Verify initial setup with a 6-digit code</li>
     <li>Reset secret at any time</li>
-    <li>Generate and view backup codes (if enabled)</li>
+    <li>Generate and view backup codes</li>
 </ul>
 
 <h3>Enforced MFA on Login</h3>
@@ -62,7 +81,7 @@ The module integrates deeply with CMSMS’s login flow, preventing access to the
 
 <h3>App Display Name</h3>
 <p>Controls the name shown inside authenticator apps.<br>
-Example: <em>M6 Digital Admin</em></p>
+Example: <em>M6 Digital CMSMS</em></p>
 
 <h3>Enable Backup Codes</h3>
 <ul>
@@ -96,10 +115,6 @@ Allows <strong>user ID 1</strong> to log in without MFA. Useful for emergencies,
 <strong>should be disabled on production systems</strong>.
 </p>
 
-<h3>Login Message</h3>
-<p>Custom text displayed on the 2FA prompt.<br>
-Example: <em>Enter the 6-digit code from your authenticator app.</em></p>
-
 <h2>Enrollment Workflow</h2>
 <ol>
     <li>User opens <strong>Set Up / Manage My 2FA</strong></li>
@@ -119,58 +134,3 @@ Example: <em>Enter the 6-digit code from your authenticator app.</em></p>
     <li>On success → user is redirected into admin</li>
 </ol>
 
-<h2>Database Schema</h2>
-
-<h3><code>cms_module_ga_users</code></h3>
-<table border="1" cellpadding="6" cellspacing="0">
-    <tr><th>Column</th><th>Description</th></tr>
-    <tr><td>user_id</td><td>CMSMS user ID</td></tr>
-    <tr><td>secret</td><td>Base32 TOTP secret</td></tr>
-    <tr><td>enabled</td><td>1 = MFA required</td></tr>
-    <tr><td>created_date</td><td>Timestamp</td></tr>
-    <tr><td>modified_date</td><td>Timestamp</td></tr>
-</table>
-
-<h3><code>cms_module_ga_backup_codes</code></h3>
-<table border="1" cellpadding="6" cellspacing="0">
-    <tr><th>Column</th><th>Description</th></tr>
-    <tr><td>id</td><td>Row ID</td></tr>
-    <tr><td>user_id</td><td>CMSMS user ID</td></tr>
-    <tr><td>code</td><td>Backup code</td></tr>
-    <tr><td>used</td><td>0/1 (whether redeemed)</td></tr>
-    <tr><td>created_date</td><td>Timestamp</td></tr>
-    <tr><td>used_date</td><td>Timestamp</td></tr>
-</table>
-
-<h2>Troubleshooting</h2>
-
-<h3>Login Loops</h3>
-<ul>
-    <li>CMS_USER_KEY missing from session</li>
-    <li>Secret exists but MFA not enabled</li>
-    <li>Bad session save path</li>
-    <li>Redirect logic incorrectly bypassed</li>
-</ul>
-
-<h3>TOTP Codes Not Working</h3>
-<ul>
-    <li>Ensure the phone clock is synced</li>
-    <li>Increase TOTP drift window</li>
-    <li>Verify the secret stored in DB matches the QR code</li>
-    <li>Regenerate secret if QR code was cached</li>
-</ul>
-
-<h3>Backup Codes Not Working</h3>
-<ul>
-    <li>Backup codes must be enabled</li>
-    <li>The code may already be used</li>
-    <li>User session must match the owning user ID</li>
-</ul>
-
-<h2>Security Notes</h2>
-<ul>
-    <li>Consider encrypting secrets in the database</li>
-    <li>Only admin users are subject to MFA</li>
-    <li>Disable root bypass in production</li>
-    <li>Avoid drift settings > 1 unless necessary</li>
-</ul>

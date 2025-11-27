@@ -8,7 +8,6 @@
   <td><input type="text" name="{$actionid}app_display_name" value="{$prefs.app_display_name}" size="40"></td>
 </tr>
 
-
 <tr>
   <td>Enable backup codes</td>
   <td><input type="checkbox" name="{$actionid}enable_backup_codes" {if $prefs.enable_backup_codes}checked{/if}></td>
@@ -22,11 +21,6 @@
 <tr>
   <td>Allow superadmin bypass (user 1)</td>
   <td><input type="checkbox" name="{$actionid}allow_root_bypass" {if $prefs.allow_root_bypass}checked{/if}></td>
-</tr>
-
-<tr>
-  <td>Custom login message</td>
-  <td><textarea name="{$actionid}login_message" rows="3" cols="50">{$prefs.login_message}</textarea></td>
 </tr>
 
 </table>

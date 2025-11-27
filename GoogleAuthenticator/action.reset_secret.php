@@ -27,4 +27,5 @@ $this->SaveUserSecret($userid, $new_secret, false);
 audit('', 'GoogleAuthenticator', "2FA secret reset for user {$userid}");
 
 // Redirect with success message
+$this->SetMessage('Secret Reset. You need to delete your Google Authenticator entry and rescan QR code');
 $this->Redirect($id, 'admin_users', $returnid, ['message' => 'Secret reset successfully.']);

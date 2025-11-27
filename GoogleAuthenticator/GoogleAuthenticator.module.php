@@ -1,26 +1,7 @@
 <?php
 #---------------------------------------------------------------------------------------------------
 # Module: GoogleAuthenticator
-# Authors: [Your Name]
-# Copyright: (C) 2025 [Your Name]
-# Licence: GNU General Public License version 3. See http://www.gnu.org/licenses/
-#---------------------------------------------------------------------------------------------------
-# CMS Made Simple(TM) is (c) CMS Made Simple Foundation 2004-2025 (info@cmsmadesimple.org)
-# Project's homepage is: http://www.cmsmadesimple.org
-#---------------------------------------------------------------------------------------------------
-# This program is free software; you can redistribute it and/or modify it under the terms of the GNU
-# General Public License as published by the Free Software Foundation; either version 3 of the
-# License, or (at your option) any later version.
-#
-# However, as a special exception to the GPL, this software is distributed
-# as an addon module to CMS Made Simple. You may not use this software
-# in any Non GPL version of CMS Made simple, or in any version of CMS
-# Made simple that does not indicate clearly and obviously in its admin
-# section that the site was built with CMS Made simple.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-# without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Authors: Jeff Minus
 #---------------------------------------------------------------------------------------------------
 
 if( !defined('CMS_VERSION') ) exit;
@@ -43,67 +24,23 @@ class GoogleAuthenticator extends CMSModule
         parent::__construct();
     }
 
-    public function GetVersion()
-    {
-        return '1.0.0';
-    }
-
-    public function GetFriendlyName()
-    {
-        return $this->Lang('friendlyname');
-    }
-
-    public function GetAdminDescription()
-    {
-        return $this->Lang('admindescription');
-    }
-
-    public function IsPluginModule()
-    {
-        return TRUE;
-    }
-
-    public function HasAdmin()
-    {
-        return TRUE;
-    }
-
-    public function HandlesEvents()
-    {
-        return TRUE;
-    }
-
-    public function VisibleToAdminUser()
-    {
-        return $this->CheckPermission(self::MANAGE_PERM);
-    }
-
-    public function GetAuthor()
-    {
-        return '[Your Name]';
-    }
-
-    public function GetAuthorEmail()
-    {
-        return 'jeff@m6digital.com';
-    }
-
-    public function UninstallPreMessage()
-    {
-        return $this->Lang('ask_uninstall');
-    }
-
-    public function GetAdminSection()
-    {
-        return 'extensions';
-    }
-
-    public function MinimumCMSVersion()
-    {
-        return '2.2.10';
-    }
-	
-	
+    public function GetVersion() { return '1.0.0'; }
+    public function GetFriendlyName(){ return $this->Lang('friendlyname'); }
+    public function GetAdminDescription() { return $this->Lang('admindescription'); }
+    public function IsPluginModule() { return TRUE; }
+    public function HasAdmin() { return TRUE; }
+    public function HandlesEvents() { return TRUE; }
+    public function VisibleToAdminUser() { return $this->CheckPermission(self::MANAGE_PERM);}
+    public function GetAuthor(){ return 'Jeff Minus'; }
+    public function GetAuthorEmail(){ return 'jeff@m6digital.com'; }
+    public function UninstallPreMessage(){return $this->Lang('ask_uninstall'); }
+    public function GetAdminSection(){ return 'extensions';}
+    public function MinimumCMSVersion(){ return '2.2.10'; }
+    public function GetHelp(){ return @file_get_contents(__DIR__.'/README.md'); }
+    public function GetChangeLog(){return @file_get_contents(__DIR__.'/changelog.inc');}
+    public function GetEventDescription($name){ return $this->Lang('eventdesc_'.$name);}
+	public function InitializeAdmin(){ \CMSMS\HookManager::add_hook('admin_add_headtext', [ $this, 'AdminAddHeadtext' ]);}	
+		
     public function InitializeFrontend()
     {
         $this->RegisterModulePlugin();
@@ -111,34 +48,13 @@ class GoogleAuthenticator extends CMSModule
         $this->SetParameterType('action', CLEAN_STRING);
         $this->SetParameterType('code', CLEAN_STRING);
     }
-
-	public function InitializeAdmin()
-	{
-		\CMSMS\HookManager::add_hook('admin_add_headtext', [ $this, 'AdminAddHeadtext' ]);
-	}	
-	
-	
+		
 	public function AdminAddHeadtext($params)
 	{
-		audit('', 'GoogleAuthenticator', 'admin_add_headtext fired');
+		//audit('', 'GoogleAuthenticator', 'admin_add_headtext fired');
 		$this->Enforce2FA();
 		return ''; // do not output JS/CSS — just trigger logic
 	}
-	
-    public function GetHelp()
-    {
-        return @file_get_contents(__DIR__.'/README.md');
-    }
-
-    public function GetChangeLog()
-    {
-        return @file_get_contents(__DIR__.'/doc/changelog.inc');
-    }
-
-    public function GetEventDescription($name)
-    {
-        return $this->Lang('eventdesc_'.$name);
-    }
 	
 	public function DoEvent($originator, $eventname, &$params)
 	{
@@ -155,7 +71,6 @@ class GoogleAuthenticator extends CMSModule
 			$this->HandleLogoutPost($params);
 			return;
 		}
-	
 	}
 
 	
@@ -167,6 +82,10 @@ class GoogleAuthenticator extends CMSModule
 
 		// 2FA disabled?
 		if (!$this->IsUser2FAEnabled($userid)) return;
+		
+		if ($this->GetPreference('allow_root_bypass', 1)) {
+			return;
+		}
 
 		// Already verified?
 		if (!empty($_SESSION[self::SESSION_2FA_VERIFIED]) &&
@@ -201,15 +120,9 @@ class GoogleAuthenticator extends CMSModule
 					. '/moduleinterface.php?mact=GoogleAuthenticator,m1_,verify_2fa,0'
 					. $token;
 
-		//audit('', 'GoogleAuthenticator', "Redirect → {$verify_url}");
-
 		redirect($verify_url);
 		exit;
 	}
-
-
-
-
 
     /**
      * Handle post-login event to check 2FA requirement
@@ -240,12 +153,6 @@ class GoogleAuthenticator extends CMSModule
 
 		//audit('', 'GoogleAuthenticator', "Set SESSION_TEMP_USER={$userid}");
 	}
-
-
-
-
-
-
 
     /**
      * Handle logout event

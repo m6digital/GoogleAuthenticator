@@ -26,7 +26,7 @@
                     <span style="color:red;font-weight:bold;">NO</span>
                 {/if}
             </td>
-            <td>{$row.actions}</td>
+            <td>{if $loggedInUser == $row.userid}{$row.actions}{else} Must Be Logged In{/if}</td>
         </tr>
     {/foreach}
     </tbody>

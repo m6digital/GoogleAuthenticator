@@ -10,6 +10,12 @@ if (!$this->CheckPermission(GoogleAuthenticator::MANAGE_PERM)) {
 $db      = cmsms()->GetDb();
 $userops = cmsms()->GetUserOperations();
 
+//GET LOGGED IN USER
+$user   = $userops->LoadUserByID(get_userid());
+$userid = (int)$user->id;
+$smarty->assign('loggedInUser',$userid);
+
+
 // Load all CMSMS admin users
 $query = "SELECT user_id, username, first_name, last_name, email 
           FROM " . cms_db_prefix() . "users 

@@ -1,9 +1,9 @@
 <?php
 if (!defined('CMS_VERSION')) exit;
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+//ini_set('display_errors', 1);
+//ini_set('display_startup_errors', 1);
+//error_reporting(E_ALL);
 
 $config = cmsms()->GetConfig();
 
@@ -14,21 +14,23 @@ audit('', 'GoogleAuthenticator', "process_verify_2fa: userid={$userid}");
 audit('', 'GoogleAuthenticator', "process_verify_2fa: code_entered={$code}");
 
 if (!$userid) {
-    echo $this->ShowErrors('Session expired. Please log in again.');
+    $this->SetError('Session expired. Please log in again.');
+	$this->Redirect($id,'verify_2fa',$returnid);
     return;
 }
 
 if ($code === '') {
-    echo $this->ShowErrors('Please enter your verification code.');
-    return;
+    $this->SetError('Please enter your verification code.');
+   	$this->Redirect($id,'verify_2fa',$returnid);
+	return;
 }
 
 // Load user secret
 $secret = $this->GetUserSecret($userid);
-audit('', 'GoogleAuthenticator', "process_verify_2fa: secret={$secret}");
 
 if (!$secret) {
-    echo $this->ShowErrors('No 2FA secret found for this user.');
+	$this->SetError('No 2FA secret found for this user.');
+	$this->Redirect($id,'verify_2fa',$returnid);
     return;
 }
 
@@ -50,8 +52,8 @@ if ($is_valid_totp) {
     $_SESSION[GoogleAuthenticator::SESSION_2FA_VERIFIED] = $userid;
     unset($_SESSION[GoogleAuthenticator::SESSION_TEMP_USER]);
 
-    redirect($config['admin_url']);
-    exit;
+	$this->SetMessage('Authentication Success!');
+	$this->Redirect($id,'defaultadmin',$returnid);
 }
 
 
@@ -82,5 +84,5 @@ if ($enable_backup) {
 // --------------------------------------------------------------
 audit('', 'GoogleAuthenticator', "process_verify_2fa: INVALID CODE for user {$userid}");
 
-echo $this->ShowErrors('Invalid verification code. Please try again.');
-return;
+$this->SetError('Invalid or expired code.');
+$this->Redirect($id,'verify_2fa',$returnid);
